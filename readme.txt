@@ -1,4 +1,4 @@
-=== Content Update Notification Name ===
+=== Content Update Notification ===
 Contributors: norcross, reaktivstudios, southernweb
 Tags: notify, notification, email updates, compliance, change notification, alerts
 Requires at least: 3.7
