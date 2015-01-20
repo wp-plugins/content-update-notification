@@ -7,8 +7,7 @@ class CUN_Content {
 	 * there are many like it, but this one is mine
 	 */
 	public function __construct() {
-
-		add_action		(	'save_post',					array(	$this,	'status_change_notify'	),	1		);
+		add_action( 'save_post',                    array( $this, 'status_change_notify'    )           );
 	}
 
 	/**
@@ -24,21 +23,16 @@ class CUN_Content {
 		}
 
 		// load our two arrays of items
-		$types		= CUN_Core::content_types();
-		$statuses	= CUN_Core::content_statuses();
+		$types      = CUN_Core::content_types();
+		$statuses   = CUN_Core::content_statuses();
 
 		// bail if we never set them or someone cleared them
-		if ( ! $types || ! $statuses ) {
+		if ( empty( $types ) || empty( $statuses ) ) {
 			return $post_id;
 		}
 
-		// fetch item type and compare it
-		if ( ! in_array( get_post_type( $post_id ), $types ) ) {
-			return $post_id;
-		}
-
-		// fetch item status and compare it
-		if ( ! in_array( get_post_status( $post_id ), $statuses ) ) {
+		// compare our post types and statuses to compare before going on
+		if ( ! in_array( get_post_type( $post_id ), $types ) || ! in_array( get_post_status( $post_id ), $statuses ) ) {
 			return $post_id;
 		}
 
@@ -48,29 +42,25 @@ class CUN_Content {
 		}
 
 		// fetch the user ID of the change
-		$user_id	= isset( $_POST['user_ID'] ) && ! empty( $_POST['user_ID'] ) ? $_POST['user_ID'] : '';
+		$user_id    = ! empty( $_POST['user_ID'] ) ? $_POST['user_ID'] : '';
 
-		// set our $_POST as a data variable
-		$data	= array(
-			'user_id'	=> $user_id
-		);
-
-		// run the data filter to catch other stuff
-		$data	= apply_filters( 'cun_notification_data', $_POST, $data, $post_id );
+		// run the data filter to catch other stuff, with the user ID as a default
+		$data   = apply_filters( 'cun_notification_data', $_POST, array( 'user_id' => absint( $user_id ) ), $post_id );
 
 		// send our email
 		self::build_notification_email( $post_id, $data );
 
+		// and return the post ID
 		return $post_id;
-
 	}
 
 	/**
-	 * [process_notification_email description]
+	 * build the email to send
+	 *
 	 * @param  [type] $data [description]
 	 * @return [type]          [description]
 	 */
-	static function build_notification_email( $post_id, $data ) {
+	public static function build_notification_email( $post_id = 0, $data ) {
 
 		// make sure our post ID is actually numeric
 		if ( ! is_numeric( $post_id ) ) {
@@ -78,9 +68,10 @@ class CUN_Content {
 		}
 
 		// now make sure it exists in the DB
-		$post_data	= get_post( $post_id );
+		$post_data  = get_post( $post_id );
 
-		if ( ! $post_data ) {
+		// bail without post data
+		if ( empty( $post_data ) || ! is_object( $post_data ) ) {
 			return;
 		}
 
@@ -88,16 +79,17 @@ class CUN_Content {
 		$items	= CUN_Core::get_email_items( $post_id, $data );
 
 		// bail if there's nothing to send
-		if ( ! $items ) {
+		if ( empty( $items ) ) {
 			return;
 		}
 
 		// fetch the email address list
-		$list	= CUN_Core::get_email_list();
+		$list   = CUN_Core::get_email_list();
 
 		// run the filter to look for item-specific settings
-		$list	= apply_filters( 'cun_email_list_members', $list, $post_id );
+		$list   = apply_filters( 'cun_email_list_members', $list, $post_id );
 
+		// bail on empty list
 		if ( ! $list || empty( $list ) ) {
 			return;
 		}
@@ -109,53 +101,47 @@ class CUN_Content {
 
 		// just be done
 		return;
-
 	}
 
 	/**
-	 * [set_html_content_type description]
+	 * set the email type to HTML
 	 */
-	static function set_html_content_type() {
-
+	public static function set_html_content_type() {
 		return 'text/html';
-
 	}
 
 	/**
-	 * [send_notification_email description]
+	 * send the email
+	 *
 	 * @param  [type] $email [description]
 	 * @param  [type] $items [description]
 	 * @return [type]        [description]
 	 */
-	static function send_notification_email( $email, $items ) {
+	public static function send_notification_email( $email, $items ) {
 
 		// bail if we have no data or email
-		if ( ! $email || ! $items ) {
+		if ( empty( $email )|| empty( $items ) ) {
 			return;
 		}
 
 		// switch to HTML format
-		add_filter( 'wp_mail_content_type', array( __CLASS__, 'set_html_content_type' ) );
+		add_filter( 'wp_mail_content_type', array( __class__, 'set_html_content_type' ) );
 
 		// set my headers
-		$headers	= 'From: '.$items['from-name'].' <'.$items['from-addr'].'>' . "\r\n" ;
-		$headers	= apply_filters( 'cun_email_headers', $headers );
+		$headers    = 'From: '.$items['from-name'].' <'.$items['from-addr'].'>' . "\r\n" ;
+		$headers    = apply_filters( 'cun_email_headers', $headers );
 
 		// run the email body through the formatter
-		$content	= CUN_Core::format_email_content( $items['content'] );
+		$content    = CUN_Core::format_email_content( $items['content'] );
 
 		// send the actual email
-		$process	= wp_mail( $email, $items['subject'], $content, $headers );
+		$process    = wp_mail( $email, $items['subject'], $content, $headers );
 
 		 // reset content-type
-		remove_filter( 'wp_mail_content_type', array( __CLASS__, 'set_html_content_type' ) );
+		remove_filter( 'wp_mail_content_type', array( __class__, 'set_html_content_type' ) );
 
 		// set a quick message to return back
-		$result		= ! $process ? __( 'Email failed', 'content-update-notification' ) : __( 'Email sent', 'content-update-notification' );
-
-		// then done
-		return $result;
-
+		return ! $process ? __( 'Email failed', 'content-update-notification' ) : __( 'Email sent', 'content-update-notification' );
 	}
 
 // end class

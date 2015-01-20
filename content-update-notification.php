@@ -1,10 +1,10 @@
 <?php
 /*
 Plugin Name: Content Update Notification
-Plugin URI: http://southernweb.com/
+Plugin URI: http://reaktivstudios.com/custom-plugins
 Description: Alert users and other people when content has been created or changed.
-Author: Andrew Norcross and Southern Web Group
-Version: 1.0.0
+Author: Andrew Norcross
+Version: 1.0.1
 Requires at least: 3.7
 Author URI: http://southernweb.com/
 */
@@ -30,7 +30,7 @@ if( ! defined( 'CNUPDN_BASE ' ) ) {
 }
 
 if( ! defined( 'CNUPDN_VER' ) ) {
-	define( 'CNUPDN_VER', '1.0.0' );
+	define( 'CNUPDN_VER', '1.0.1' );
 }
 
 
@@ -48,9 +48,8 @@ class CUN_Core
 	 * there are many like it, but this one is mine
 	 */
 	private function __construct() {
-		add_action		(	'plugins_loaded',			array(  $this,  'textdomain'			)			);
-		add_action		(	'plugins_loaded',			array(	$this,	'load_files'			)			);
-
+		add_action( 'plugins_loaded',           array( $this, 'textdomain'          )           );
+		add_action( 'plugins_loaded',           array( $this, 'load_files'          )           );
 	}
 
 	/**
@@ -59,10 +58,9 @@ class CUN_Core
 	 *
 	 * @return
 	 */
-
 	public static function getInstance() {
 
-		if ( !self::$instance ) {
+		if ( ! self::$instance ) {
 			self::$instance = new self;
 		}
 
@@ -74,7 +72,6 @@ class CUN_Core
 	 * @return [type] [description]
 	 */
 	public function textdomain() {
-
 		load_plugin_textdomain( 'content-update-notification', false, dirname( plugin_basename( __FILE__ ) ) . '/languages/' );
 	}
 
@@ -83,10 +80,8 @@ class CUN_Core
 	 * @return [type] [description]
 	 */
 	public function load_files() {
-
 		require_once( 'lib/admin.php'	);
 		require_once( 'lib/content.php'	);
-
 	}
 
 	/**
@@ -96,8 +91,9 @@ class CUN_Core
 	 *
 	 * @return [type] [description]
 	 */
-	static function email_tag_data() {
+	public static function email_tag_data() {
 
+		// build our array of tags
 		$tags	= array(
 			array(
 				'code'	=> '{content-site}',
@@ -121,126 +117,124 @@ class CUN_Core
 			),
 		);
 
-		$tags	= apply_filters( 'cun_email_tag_list', $tags );
+		// filter available tags
+		$tags   = apply_filters( 'cun_email_tag_list', $tags );
 
-		return $tags;
-
+		// return the tags (or false if empty)
+		return ! empty( $tags ) ? $tags : false;
 	}
 
 
 	/**
-	 * [content_types description]
+	 * filter the available post types the
+	 * plugin will function on
+	 *
 	 * @return [type] [description]
 	 */
-	static function content_types() {
-
-		$types	= apply_filters( 'cun_content_types', array( 'post', 'page' ) );
-
-		return $types;
-
+	public static function content_types() {
+		return apply_filters( 'cun_content_types', array( 'post', 'page' ) );
 	}
 
 	/**
-	 * [content_statuses description]
+	 * filter the post statuses the notifications
+	 * will be triggered on
+	 *
 	 * @return [type] [description]
 	 */
-	static function content_statuses() {
-
-		$statuses	= apply_filters( 'cun_content_statuses', array( 'publish', 'pending', 'future', 'private' ) );
-
-		return $statuses;
-
+	public static function content_statuses() {
+		return apply_filters( 'cun_content_statuses', array( 'publish', 'pending', 'future', 'private' ) );
 	}
 
 	/**
-	 * get the content of the email from the settings and run it through the various filters
+	 * get the content of the email from the settings and
+	 * run it through the various filters
+	 *
 	 * @param  [type] $data    [description]
 	 * @param  [type] $content [description]
 	 * @return [type]          [description]
 	 */
-	static function convert_email_tags( $post_id, $data, $text ) {
+	public static function convert_email_tags( $post_id, $data, $text ) {
 
-		$tags	= self::email_tag_data();
+		// fetch the email tag data
+		$tags   = self::email_tag_data();
 
+		// bail with no tags, return just the text
 		if ( ! $tags ) {
 			return $text;
 		}
 
 		// get some data for swapping
-		$site	= get_bloginfo( 'name' );
-		$name	= get_the_title( $post_id );
-		$time	= get_post_modified_time( apply_filters( 'cun_date_format', 'm/d/Y @ g:i a' ), false, $post_id, false );
-		$link	= get_permalink( $post_id );
-		$user	= isset( $data['user_id'] ) ? get_the_author_meta( 'display_name', $data['user_id'] ) : '';
+		$site   = get_bloginfo( 'name' );
+		$name   = get_the_title( $post_id );
+		$time   = get_post_modified_time( apply_filters( 'cun_date_format', 'm/d/Y @ g:i a' ), false, $post_id, false );
+		$link   = get_permalink( $post_id );
+		$user   = isset( $data['user_id'] ) ? get_the_author_meta( 'display_name', $data['user_id'] ) : '';
 
-		$hold	= array( '{content-site}', '{content-name}', '{content-time}', '{content-view-link}', '{content-edit-user}' );
-		$full	= array( $site, $name, $time, $link, $user );
+		// set up the arrays for the find / replace
+		$hold   = array( '{content-site}', '{content-name}', '{content-time}', '{content-view-link}', '{content-edit-user}' );
+		$full   = array( $site, $name, $time, $link, $user );
 
-		$text	= str_replace( $hold, $full, $text );
+		// do the find / replace
+		$text   = str_replace( $hold, $full, $text );
 
-		// filter the text for other possible search replace
-		$text	= apply_filters( 'cua_convert_email_text', $text );
-
-		// send back the filtered text
-		return $text;
-
+		// filter and return the text for other possible search replace
+		return apply_filters( 'cua_convert_email_text', $text );
 	}
 
 	/**
-	 * [get_email_subject description]
+	 * get the email subject line
+	 *
 	 * @param  [type] $settings [description]
 	 * @return [type]           [description]
 	 */
-	static function get_email_subject( $post_id, $data, $settings ) {
+	public static function get_email_subject( $post_id, $data, $settings ) {
 
-		$default	= __( 'Content has recently been changed', 'content-update-notification' );
+		// set a default
+		$default    = __( 'Content has recently been changed', 'content-update-notification' );
 
-		if ( isset( $settings['subject'] ) && ! empty( $settings['subject'] ) ) {
-			$subject	= self::convert_email_tags( $post_id, $data, $settings['subject'] );
+		// check for a user generated value
+		if ( ! empty( $settings['subject'] ) ) {
+			$subject    = self::convert_email_tags( $post_id, $data, $settings['subject'] );
 		} else {
-			$subject	= self::convert_email_tags( $post_id, $data, $default );
+			$subject    = self::convert_email_tags( $post_id, $data, $default );
 		}
 
-		// run the filter
-		$subject	= apply_filters( 'cua_email_subject', $subject );
-
-		// send it back
-		return $subject;
-
+		// run the filter and return
+		return apply_filters( 'cua_email_subject', $subject );
 	}
 
 	/**
-	 * [get_email_content description]
+	 * get the email content
+	 *
 	 * @param  [type] $settings [description]
 	 * @return [type]           [description]
 	 */
-	static function get_email_content( $post_id, $data, $settings ) {
+	public static function get_email_content( $post_id, $data, $settings ) {
 
+		// build the default
 		$default	= 'The item {content-name} was updated at {content-time} by {content-edit-user}'."\n";
 		$default	.= 'You can view the content here: {content-view-link}';
 
-		if ( isset( $settings['content'] ) && ! empty( $settings['content'] ) ) {
-			$content	= self::convert_email_tags( $post_id, $data, $settings['content'] );
+		// check for a user generated value
+		if ( ! empty( $settings['content'] ) ) {
+			$content    = self::convert_email_tags( $post_id, $data, $settings['content'] );
 		} else {
-			$content	= self::convert_email_tags( $post_id, $data, $default );
+			$content    = self::convert_email_tags( $post_id, $data, $default );
 		}
 
-		// run the filter
-		$content	= apply_filters( 'cua_email_content', $content );
-
-		// send it back
-		return $content;
-
+		// run the filter and return
+		return apply_filters( 'cua_email_content', $content );
 	}
 
 	/**
-	 * [get_email_from_name description]
+	 * get the "from" name in the email
+	 *
 	 * @return [type] [description]
 	 */
-	static function get_email_from_name() {
+	public static function get_email_from_name() {
 
 		// fetch the site name run it through the filter
-		$name	= apply_filters( 'cun_email_from_name', get_bloginfo( 'name' ) );
+		$name   = apply_filters( 'cun_email_from_name', get_bloginfo( 'name' ) );
 
 		// run the check and return the default if no one sets it
 		if ( ! $name || empty( $name ) ) {
@@ -249,125 +243,116 @@ class CUN_Core
 
 		// return it escaped
 		return esc_html( $name );
-
 	}
 
 	/**
-	 * [get_email_from_address description]
+	 * get the "from" address
+	 *
 	 * @return [type] [description]
 	 */
-	static function get_email_from_address() {
+	public static function get_email_from_address() {
 
 		// fetch the site admin email run it through the filter
-		$address	= apply_filters( 'cun_email_from_address', get_option( 'admin_email' ) );
+		$addr   = apply_filters( 'cun_email_from_address', get_option( 'admin_email' ) );
 
-		if ( ! $address || empty( $address ) || ! is_email( $address ) ) {
-			return get_option( 'admin_email' );
-		}
-
-		// return it escaped
-		return $address;
-
+		// return the user set one or admin email as fallback
+		return ! $addr || empty( $addr ) || ! is_email( $addr ) ? get_option( 'admin_email' ) : sanitize_email( $addr );
 	}
 
 	/**
-	 * [get_email_items description]
+	 * get the items for the email based on post ID
 	 * @param  [type] $post_id [description]
 	 * @param  [type] $data    [description]
 	 * @return [type]          [description]
 	 */
-	static function get_email_items( $post_id, $data ) {
+	public static function get_email_items( $post_id = 0, $data ) {
 
 		// fetch our settings and bail if we don't have any
-		$settings	= get_option( 'cun-settings' );
+		$settings   = get_option( 'cun-settings' );
 
+		// bail with no settings
 		if ( ! $settings ) {
 			return false;
 		}
 
 		// get the email pieces
-		$subject	= self::get_email_subject( $post_id, $data, $settings );
-		$content	= self::get_email_content( $post_id, $data, $settings );
+		$subject    = self::get_email_subject( $post_id, $data, $settings );
+		$content    = self::get_email_content( $post_id, $data, $settings );
 
 		if ( ! $subject || ! $content ) {
 			return false;
 		}
 
 		// fetch some basic info
-		$from_name	= self::get_email_from_name();
-		$from_addr	= self::get_email_from_address();
+		$from_name  = self::get_email_from_name();
+		$from_addr  = self::get_email_from_address();
 
+		// return the array
 		return array(
 			'from-name'	=> $from_name,
 			'from-addr'	=> $from_addr,
 			'subject'	=> $subject,
 			'content'	=> $content
 		);
-
 	}
 
 	/**
-	 * [get_email_list description]
+	 * get the list items for the email
+	 *
 	 * @return [type] [description]
 	 */
-	static function get_email_list() {
+	public static function get_email_list() {
 
+		// fetch the settings
 		$settings	= get_option( 'cun-settings' );
 
-		if ( ! $settings['list'] )
+		// bail if settings list is empty
+		if ( empty( $settings['list'] ) ) {
 			return false;
+		}
 
 		// bust out our list into an array
-		$list	= explode(',', $settings['list'] );
+		$list   = explode(',', $settings['list'] );
 
-		// trim each item
-		$list	= array_map( 'trim', $list );
-
-		// send it back
-		return $list;
-
+		// trim each item and return
+		return array_map( 'trim', $list );
 	}
 
 	/**
-	 * [format_email_content description]
+	 * format the email content
+	 *
 	 * @param  [type] $content [description]
 	 * @return [type]          [description]
 	 */
-	static function format_email_content( $content ) {
+	public static function format_email_content( $content ) {
 
-		$message	= '';
+		// set an empty
+		$message    = '';
 
-		$message	.= '<html>'."\n";
-		$message	.= '<body>'."\n";
-		$message	.= apply_filters( 'cun_formatted_email_before', '' );
-		$message	.= wpautop( $content );
-		$message	.= apply_filters( 'cun_formatted_email_after', '' );
-		$message	.= '</body>'."\n";
-		$message	.= '</html>'."\n";
+		$message   .= '<html>'."\n";
+		$message   .= '<body>'."\n";
+		$message   .= apply_filters( 'cun_formatted_email_before', '' );
+		$message   .= wpautop( $content );
+		$message   .= apply_filters( 'cun_formatted_email_after', '' );
+		$message   .= '</body>'."\n";
+		$message   .= '</html>'."\n";
 
 		// send it back
 		return trim( $message );
-
 	}
 
 	/**
-	 * [help_content description]
+	 * setup the help tab content
 	 * @param  [type] $tab [description]
 	 * @return [type]      [description]
 	 */
-	static function help_content( $tab = false ) {
+	public static function help_content( $tab = false ) {
 
+		// admin filters
 		$help['admin-filters']	= __( '<code>cun_before_email_notification_settings</code>', 'content-notification-settings' );
 
-
-		// bail if we don't have our requested tab
-		if ( ! isset( $help[$tab] ) || isset( $help[$tab] ) && empty( $help[$tab] ) ) {
-			return;
-		}
-
-		// return our requested help tab
-		return $help[$tab];
-
+		// return our requested help tab or false
+		return ! empty( $help[$tab] ) ? $help[$tab] : false;
 	}
 
 /// end class
