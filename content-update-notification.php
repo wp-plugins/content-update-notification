@@ -6,7 +6,7 @@ Description: Alert users and other people when content has been created or chang
 Author: Andrew Norcross
 Version: 1.0.1
 Requires at least: 3.7
-Author URI: http://southernweb.com/
+Author URI: http://reaktivstudios.com/
 */
 /*  Copyright 2014 Andrew Norcross
 
