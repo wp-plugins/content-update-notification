@@ -4,11 +4,11 @@ Plugin Name: Content Update Notification
 Plugin URI: http://reaktivstudios.com/custom-plugins
 Description: Alert users and other people when content has been created or changed.
 Author: Andrew Norcross
-Version: 1.0.1
+Version: 1.0.2
 Requires at least: 3.7
 Author URI: http://reaktivstudios.com/
 */
-/*  Copyright 2014 Andrew Norcross
+/*  Copyright 2014 Reaktiv Studios
 
 	This program is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
@@ -30,10 +30,10 @@ if( ! defined( 'CNUPDN_BASE ' ) ) {
 }
 
 if( ! defined( 'CNUPDN_VER' ) ) {
-	define( 'CNUPDN_VER', '1.0.1' );
+	define( 'CNUPDN_VER', '1.0.2' );
 }
 
-
+// start the engine
 class CUN_Core
 {
 
@@ -69,6 +69,7 @@ class CUN_Core
 
 	/**
 	 * [textdomain description]
+	 *
 	 * @return [type] [description]
 	 */
 	public function textdomain() {
@@ -77,11 +78,12 @@ class CUN_Core
 
 	/**
 	 * [load_files description]
+	 *
 	 * @return [type] [description]
 	 */
 	public function load_files() {
-		require_once( 'lib/admin.php'	);
-		require_once( 'lib/content.php'	);
+		require_once( 'lib/admin.php'   );
+		require_once( 'lib/content.php' );
 	}
 
 	/**
@@ -146,14 +148,54 @@ class CUN_Core
 	}
 
 	/**
+	 * get a default value for a portion or the entire
+	 * setup inside an email
+	 *
+	 * @param  string $key [description]
+	 *
+	 * @return [type]      [description]
+	 */
+	public static function get_default_values( $key = '' ) {
+
+		// our default subject
+		$subject    = __( 'Content has recently been changed', 'content-update-notification' );
+
+		// default content
+		$content    = '';
+		$content   .= 'The item {content-name} was updated at {content-time} by {content-edit-user}' . "\n";
+		$content   .= 'You can view the content here: {content-view-link}';
+
+		// set an array
+		$defaults   = array(
+			'subject'   => $subject,
+			'content'   => $content,
+		);
+
+		// return all if no key is requested
+		if ( empty( $key ) ) {
+			return $defaults;
+		}
+
+		// return specific item
+		if ( ! empty( $key ) && ! empty( $defaults[ $key ] ) ) {
+			return $defaults[ $key ];
+		}
+
+		// neither. bail.
+		return false;
+	}
+
+	/**
 	 * get the content of the email from the settings and
 	 * run it through the various filters
 	 *
-	 * @param  [type] $data    [description]
-	 * @param  [type] $content [description]
-	 * @return [type]          [description]
+	 * @param  integer $post_id [description]
+	 * @param  array   $data    [description]
+	 * @param  string  $text    [description]
+	 *
+	 * @return [type]           [description]
 	 */
-	public static function convert_email_tags( $post_id, $data, $text ) {
+	public static function convert_email_tags( $post_id = 0, $data = array(), $text = '' ) {
 
 		// fetch the email tag data
 		$tags   = self::email_tag_data();
@@ -168,7 +210,7 @@ class CUN_Core
 		$name   = get_the_title( $post_id );
 		$time   = get_post_modified_time( apply_filters( 'cun_date_format', 'm/d/Y @ g:i a' ), false, $post_id, false );
 		$link   = get_permalink( $post_id );
-		$user   = isset( $data['user_id'] ) ? get_the_author_meta( 'display_name', $data['user_id'] ) : '';
+		$user   = ! empty( $data['user_ID'] ) ? get_the_author_meta( 'display_name', $data['user_ID'] ) : '';
 
 		// set up the arrays for the find / replace
 		$hold   = array( '{content-site}', '{content-name}', '{content-time}', '{content-view-link}', '{content-edit-user}' );
@@ -184,20 +226,19 @@ class CUN_Core
 	/**
 	 * get the email subject line
 	 *
-	 * @param  [type] $settings [description]
-	 * @return [type]           [description]
+	 * @param  integer $post_id  [description]
+	 * @param  array   $data     [description]
+	 * @param  array   $settings [description]
+	 *
+	 * @return [type]            [description]
 	 */
-	public static function get_email_subject( $post_id, $data, $settings ) {
-
-		// set a default
-		$default    = __( 'Content has recently been changed', 'content-update-notification' );
+	public static function get_email_subject( $post_id = 0, $data = array(), $settings = array() ) {
 
 		// check for a user generated value
-		if ( ! empty( $settings['subject'] ) ) {
-			$subject    = self::convert_email_tags( $post_id, $data, $settings['subject'] );
-		} else {
-			$subject    = self::convert_email_tags( $post_id, $data, $default );
-		}
+		$subject    = ! empty( $settings['subject'] ) ? $settings['subject'] : self::get_default_values( 'subject' );
+
+		// run through the tag converter
+		$subject    = self::convert_email_tags( $post_id, $data, $settings['subject'] );
 
 		// run the filter and return
 		return apply_filters( 'cua_email_subject', $subject );
@@ -206,21 +247,19 @@ class CUN_Core
 	/**
 	 * get the email content
 	 *
-	 * @param  [type] $settings [description]
-	 * @return [type]           [description]
+	 * @param  integer $post_id  [description]
+	 * @param  array   $data     [description]
+	 * @param  array   $settings [description]
+	 *
+	 * @return [type]            [description]
 	 */
-	public static function get_email_content( $post_id, $data, $settings ) {
-
-		// build the default
-		$default	= 'The item {content-name} was updated at {content-time} by {content-edit-user}'."\n";
-		$default	.= 'You can view the content here: {content-view-link}';
+	public static function get_email_content( $post_id = 0, $data = array(), $settings = array() ) {
 
 		// check for a user generated value
-		if ( ! empty( $settings['content'] ) ) {
-			$content    = self::convert_email_tags( $post_id, $data, $settings['content'] );
-		} else {
-			$content    = self::convert_email_tags( $post_id, $data, $default );
-		}
+		$content    = ! empty( $settings['content'] ) ? $settings['content'] : self::get_default_values( 'content' );
+
+		// run through the tag converter
+		$content    = self::convert_email_tags( $post_id, $data, $content );
 
 		// run the filter and return
 		return apply_filters( 'cua_email_content', $content );
@@ -261,11 +300,12 @@ class CUN_Core
 
 	/**
 	 * get the items for the email based on post ID
-	 * @param  [type] $post_id [description]
-	 * @param  [type] $data    [description]
-	 * @return [type]          [description]
+	 *
+	 * @param  integer $post_id [description]
+	 * @param  array   $data    [description]
+	 * @return [type]           [description]
 	 */
-	public static function get_email_items( $post_id = 0, $data ) {
+	public static function get_email_items( $post_id = 0, $data = array() ) {
 
 		// fetch our settings and bail if we don't have any
 		$settings   = get_option( 'cun-settings' );
@@ -321,10 +361,11 @@ class CUN_Core
 	/**
 	 * format the email content
 	 *
-	 * @param  [type] $content [description]
+	 * @param  string $content [description]
+	 *
 	 * @return [type]          [description]
 	 */
-	public static function format_email_content( $content ) {
+	public static function format_email_content( $content = '' ) {
 
 		// set an empty
 		$message    = '';
@@ -343,7 +384,9 @@ class CUN_Core
 
 	/**
 	 * setup the help tab content
+	 *
 	 * @param  [type] $tab [description]
+	 *
 	 * @return [type]      [description]
 	 */
 	public static function help_content( $tab = false ) {
